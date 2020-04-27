@@ -5,6 +5,11 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { watch } from 'melanke-watchjs';
 import _ from 'lodash';
 import * as yup from 'yup';
+import axios from 'axios';
+
+const routes = {
+  corsProxy: (url) => `https://cors-anywhere.herokuapp.com/${url}`,
+};
 
 const schema = yup.object().shape({
   rss: yup.string().required().url(),
@@ -14,15 +19,42 @@ const form = document.querySelector('form');
 const output = document.querySelector('.output');
 
 const render = (state) => {
-  // form.reset();
-  output.nextSibling.innerHTML = '';
+  form.reset();
+  if (state.feeds.length === 0) {
+    return;
+  }
+  output.innerHTML = '';
   const ul = document.createElement('ul');
+  ul.classList.add('list-group', 'list-group-flush', 'list-group-item-action');
   state.feeds.forEach((feed) => {
     const li = document.createElement('li');
-    li.append(document.createTextNode(feed));
-    ul.append(li);
+    li.classList.add('list-group-item', 'list-group-item-action');
+    axios.get(routes.corsProxy(feed))
+      .then((res) => {
+        const domparser = new DOMParser();
+        const doc = domparser.parseFromString(res.data, 'text/html');
+        const title = doc.querySelector('title').innerHTML;
+        const description = doc.querySelector('description').innerHTML;
+        li.append(document.createTextNode(title));
+        li.append(' - ');
+        li.append(document.createTextNode(description));
+        const posts = doc.querySelectorAll('item');
+        console.log(posts);
+        posts.forEach((post) => {
+          const postTitle = post.querySelector('title').innerHTML;
+          const postLink = post.querySelector('link').nextSibling.textContent;
+          const div = document.createElement('div');
+          const link = document.createElement('a');
+          link.innerHTML = postTitle;
+          link.href = postLink;
+          div.append(link);
+          li.append(div);
+        });
+        ul.append(li);
+      })
+      .catch((err) => console.log(err));
   });
-  output.after(ul);
+  output.append(ul);
 };
 
 const renderError = (element, error) => {
@@ -31,7 +63,6 @@ const renderError = (element, error) => {
     element.classList.remove('is-invalid');
     errorElement.remove();
   }
-  console.log(error);
   if (_.isEmpty(error)) {
     return;
   }
