@@ -18,42 +18,50 @@ const schema = yup.object().shape({
 const form = document.querySelector('form');
 const output = document.querySelector('.output');
 
+const rssParse = (data) => {
+  const rssStream = { posts: [] };
+  const domparser = new DOMParser();
+  const doc = domparser.parseFromString(data, 'text/html');
+  try {
+    rssStream.title = doc.querySelector('title').innerHTML;
+    rssStream.description = doc.querySelector('description').innerHTML;
+    const posts = doc.querySelectorAll('item');
+    posts.forEach((post) => {
+      rssStream.posts.push({
+        postTitle: post.querySelector('title').innerHTML,
+        postLink: post.querySelector('link').nextSibling.textContent,
+      });
+    });
+  } catch (error) {
+    throw { message: 'This is is not RSS' };
+  }
+  return rssStream;
+};
+
 const render = (state) => {
   form.reset();
   if (state.feeds.length === 0) {
     return;
   }
-  output.innerHTML = '';
   const ul = document.createElement('ul');
   ul.classList.add('list-group', 'list-group-flush', 'list-group-item-action');
   state.feeds.forEach((feed) => {
     const li = document.createElement('li');
     li.classList.add('list-group-item', 'list-group-item-action');
-    axios.get(routes.corsProxy(feed))
-      .then((res) => {
-        const domparser = new DOMParser();
-        const doc = domparser.parseFromString(res.data, 'text/html');
-        const title = doc.querySelector('title').innerHTML;
-        const description = doc.querySelector('description').innerHTML;
-        li.append(document.createTextNode(title));
-        li.append(' - ');
-        li.append(document.createTextNode(description));
-        const posts = doc.querySelectorAll('item');
-        console.log(posts);
-        posts.forEach((post) => {
-          const postTitle = post.querySelector('title').innerHTML;
-          const postLink = post.querySelector('link').nextSibling.textContent;
-          const div = document.createElement('div');
-          const link = document.createElement('a');
-          link.innerHTML = postTitle;
-          link.href = postLink;
-          div.append(link);
-          li.append(div);
-        });
-        ul.append(li);
-      })
-      .catch((err) => console.log(err));
+    li.append(document.createTextNode(feed.title));
+    li.append(' - ');
+    li.append(document.createTextNode(feed.description));
+    feed.posts.forEach((post) => {
+      const div = document.createElement('div');
+      const link = document.createElement('a');
+      link.innerHTML = post.postTitle;
+      link.href = post.postLink;
+      div.append(link);
+      li.append(div);
+    });
+    ul.append(li);
   });
+  output.innerHTML = '';
   output.append(ul);
 };
 
@@ -104,13 +112,24 @@ const app = () => {
     const formData = new FormData(e.target);
     const value = formData.get('rss');
     try {
-      schema.validateSync(state.form.feilds, { abortEarly: false });
-      if (_.indexOf(state.feeds, state.form.feilds.rss) !== -1) {
-        throw { message: 'This feed already in list' };
-      }
-      state.feeds.push(value);
-      state.form.errors = {};
-      state.form.processState = 'finished';
+      schema.validate(state.form.feilds, { abortEarly: false })
+        .then(() => {
+          if (_.indexOf(state.feeds, state.form.feilds.rss) !== -1) {
+            throw { message: 'This feed already in list' };
+          }
+          axios.get(routes.corsProxy(value))
+            .then((res) => {
+              try {
+                const rssStream = rssParse(res.data);
+                state.feeds.push(rssStream);
+                state.form.errors = {};
+                state.form.processState = 'finished';
+              } catch (error) {
+                state.form.errors = error;
+              }
+            });
+        })
+        .catch((err) => console.log(err));
     } catch (error) {
       state.form.errors = error;
       state.form.processState = 'failed';
