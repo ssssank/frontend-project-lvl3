@@ -19,23 +19,27 @@ const form = document.querySelector('form');
 const output = document.querySelector('.output');
 
 const rssParse = (data) => {
-  const rssStream = { posts: [] };
+  const feed = {};
+  const posts = [];
   const domparser = new DOMParser();
   const doc = domparser.parseFromString(data, 'text/html');
   try {
-    rssStream.title = doc.querySelector('title').innerHTML;
-    rssStream.description = doc.querySelector('description').innerHTML;
-    const posts = doc.querySelectorAll('item');
-    posts.forEach((post) => {
-      rssStream.posts.push({
+    feed.title = doc.querySelector('title').innerHTML;
+    feed.description = doc.querySelector('description').innerHTML;
+    feed.id = _.uniqueId();
+    const feedPosts = doc.querySelectorAll('item');
+    feedPosts.forEach((post) => {
+      posts.push({
         postTitle: post.querySelector('title').innerHTML,
         postLink: post.querySelector('link').nextSibling.textContent,
+        postId: _.uniqueId(),
+        feedId: feed.id,
       });
     });
   } catch (error) {
     throw { message: 'This is is not RSS' };
   }
-  return rssStream;
+  return { feed, posts };
 };
 
 const render = (state) => {
@@ -51,7 +55,10 @@ const render = (state) => {
     li.append(document.createTextNode(feed.title));
     li.append(' - ');
     li.append(document.createTextNode(feed.description));
-    feed.posts.forEach((post) => {
+
+    const taskForRendering = state.posts.filter(({ feedId }) => feedId === feed.id);
+
+    taskForRendering.forEach((post) => {
       const div = document.createElement('div');
       const link = document.createElement('a');
       link.innerHTML = post.postTitle;
@@ -92,6 +99,7 @@ const app = () => {
       },
     },
     feeds: [],
+    posts: [],
   };
 
   watch(state, 'feeds', () => {
@@ -114,22 +122,32 @@ const app = () => {
     try {
       schema.validate(state.form.feilds, { abortEarly: false })
         .then(() => {
-          if (_.indexOf(state.feeds, state.form.feilds.rss) !== -1) {
+          if (_.findKey(state.feeds, ['url', value])) {
             throw { message: 'This feed already in list' };
           }
-          axios.get(routes.corsProxy(value))
+          axios.get(routes.corsProxy(value), { timeout: 5000 })
             .then((res) => {
               try {
                 const rssStream = rssParse(res.data);
-                state.feeds.push(rssStream);
+                const { feed, posts } = rssStream;
+                feed.url = value;
+                state.feeds.push(feed);
+                Array.prototype.push.apply(state.posts, posts);
                 state.form.errors = {};
                 state.form.processState = 'finished';
               } catch (error) {
                 state.form.errors = error;
               }
+            })
+            .catch((err) => {
+              state.form.errors = err;
+              state.form.processState = 'failed';
             });
         })
-        .catch((err) => console.log(err));
+        .catch((err) => {
+          state.form.errors = err;
+          state.form.processState = 'failed';
+        });
     } catch (error) {
       state.form.errors = error;
       state.form.processState = 'failed';
