@@ -6,10 +6,27 @@ import { watch } from 'melanke-watchjs';
 import _ from 'lodash';
 import * as yup from 'yup';
 import axios from 'axios';
+import i18next from 'i18next';
+import resources from './locales';
+
+i18next.init({
+  lng: 'en',
+  debug: true,
+  resources,
+});
 
 const routes = {
   corsProxy: (url) => `https://cors-anywhere.herokuapp.com/${url}`,
 };
+
+yup.setLocale({
+  string: {
+    url: i18next.t('errors.isNotUrl'),
+  },
+  mixed: {
+    required: i18next.t('errors.isRequired'),
+  },
+});
 
 const schema = yup.object().shape({
   rss: yup.string().required().url(),
@@ -22,23 +39,26 @@ const rssParse = (data) => {
   const feed = {};
   const posts = [];
   const domparser = new DOMParser();
-  const doc = domparser.parseFromString(data, 'text/html');
-  try {
-    feed.title = doc.querySelector('title').innerHTML;
-    feed.description = doc.querySelector('description').innerHTML;
-    feed.id = _.uniqueId();
-    const feedPosts = doc.querySelectorAll('item');
-    feedPosts.forEach((post) => {
-      posts.push({
-        postTitle: post.querySelector('title').innerHTML,
-        postLink: post.querySelector('link').nextSibling.textContent,
-        postId: _.uniqueId(),
-        feedId: feed.id,
-      });
-    });
-  } catch (error) {
-    throw { message: 'This is is not RSS' };
+  const doc = domparser.parseFromString(data, 'text/xml');
+
+  const parseError = doc.querySelector('parsererror');
+  if (parseError) {
+    throw { message: i18next.t('errors.isNotRss') };
   }
+
+  feed.title = doc.querySelector('title').innerHTML;
+  feed.description = doc.querySelector('description').innerHTML;
+  feed.id = _.uniqueId();
+  const feedPosts = doc.querySelectorAll('item');
+  feedPosts.forEach((post) => {
+    posts.push({
+      postTitle: post.querySelector('title').innerHTML,
+      postLink: post.querySelector('link').nextSibling.textContent,
+      postId: _.uniqueId(),
+      feedId: feed.id,
+    });
+  });
+
   return { feed, posts };
 };
 
@@ -110,20 +130,21 @@ const app = () => {
     renderError(form.elements.rss, state.form.errors);
   });
 
-  form.elements.rss.addEventListener('input', (e) => {
-    state.form.feilds.rss = e.target.value;
-  });
+  // form.elements.rss.addEventListener('input', (e) => {
+  //   state.form.feilds.rss = e.target.value;
+  // });
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     state.form.processState = 'adding';
     const formData = new FormData(e.target);
     const value = formData.get('rss');
+    state.form.feilds.rss = value;
     try {
       schema.validate(state.form.feilds, { abortEarly: false })
         .then(() => {
           if (_.findKey(state.feeds, ['url', value])) {
-            throw { message: 'This feed already in list' };
+            throw { message: i18next.t('errors.isLinkDuplication') };
           }
           axios.get(routes.corsProxy(value), { timeout: 5000 })
             .then((res) => {
@@ -132,11 +153,12 @@ const app = () => {
                 const { feed, posts } = rssStream;
                 feed.url = value;
                 state.feeds.push(feed);
-                Array.prototype.push.apply(state.posts, posts);
+                state.posts.push(...posts);
                 state.form.errors = {};
                 state.form.processState = 'finished';
               } catch (error) {
                 state.form.errors = error;
+                state.form.processState = 'failed';
               }
             })
             .catch((err) => {
