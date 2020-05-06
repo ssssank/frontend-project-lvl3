@@ -32,9 +32,6 @@ const schema = yup.object().shape({
   rss: yup.string().required().url(),
 });
 
-const form = document.querySelector('form');
-const output = document.querySelector('.output');
-
 const rssParse = (data) => {
   const feed = {};
   const posts = [];
@@ -62,7 +59,8 @@ const rssParse = (data) => {
   return { feed, posts };
 };
 
-const render = (state) => {
+const render = (state, output, form) => {
+  const html = output;
   form.reset();
   if (state.feeds.length === 0) {
     return;
@@ -76,9 +74,9 @@ const render = (state) => {
     li.append(' - ');
     li.append(document.createTextNode(feed.description));
 
-    const taskForRendering = state.posts.filter(({ feedId }) => feedId === feed.id);
+    const postsForRendering = state.posts.filter(({ feedId }) => feedId === feed.id);
 
-    taskForRendering.forEach((post) => {
+    postsForRendering.forEach((post) => {
       const div = document.createElement('div');
       const link = document.createElement('a');
       link.innerHTML = post.postTitle;
@@ -88,14 +86,14 @@ const render = (state) => {
     });
     ul.append(li);
   });
-  output.innerHTML = '';
+  html.innerHTML = '';
   output.append(ul);
 };
 
-const renderError = (element, error) => {
-  const errorElement = element.nextElementSibling;
+const renderError = (field, error) => {
+  const errorElement = field.nextElementSibling;
   if (errorElement) {
-    element.classList.remove('is-invalid');
+    field.classList.remove('is-invalid');
     errorElement.remove();
   }
   if (_.isEmpty(error)) {
@@ -104,11 +102,51 @@ const renderError = (element, error) => {
   const feedbackElement = document.createElement('div');
   feedbackElement.classList.add('invalid-feedback');
   feedbackElement.innerHTML = error.message;
-  element.classList.add('is-invalid');
-  element.after(feedbackElement);
+  field.classList.add('is-invalid');
+  field.after(feedbackElement);
+};
+
+const renderForm = (form, state) => {
+  const field = form.elements.rss;
+  const submit = form.elements.add;
+
+  switch (state.form.processState) {
+    case 'filling':
+      field.value = '';
+      submit.classList.remove('disabled');
+      field.removeAttribute('readonly');
+      break;
+    case 'adding':
+      renderError(field, {});
+      submit.classList.add('disabled');
+      field.setAttribute('readonly', true);
+      break;
+    case 'failed':
+      renderError(field, state.form.errors);
+      submit.classList.remove('disabled');
+      field.removeAttribute('readonly');
+      break;
+    case 'finished':
+      submit.classList.remove('disabled');
+      field.removeAttribute('readonly');
+      break;
+    default:
+      throw new Error(`Unknown form state: '${state.form.processState}'`);
+  }
 };
 
 const app = () => {
+  const form = document.querySelector('form');
+  const output = document.querySelector('.output');
+  const title = document.querySelector('title');
+  const header = document.querySelector('h1');
+  const label = document.querySelector('label');
+
+  title.innerHTML = i18next.t('page.title');
+  header.innerHTML = i18next.t('page.header');
+  label.innerHTML = i18next.t('page.text');
+  form.elements.add.innerHTML = i18next.t('page.button');
+
   const state = {
     form: {
       processState: 'filling',
@@ -123,16 +161,12 @@ const app = () => {
   };
 
   watch(state, 'feeds', () => {
-    render(state);
+    render(state, output, form);
   });
 
-  watch(state.form, 'errors', () => {
-    renderError(form.elements.rss, state.form.errors);
+  watch(state.form, 'processState', () => {
+    renderForm(form, state);
   });
-
-  // form.elements.rss.addEventListener('input', (e) => {
-  //   state.form.feilds.rss = e.target.value;
-  // });
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -140,43 +174,38 @@ const app = () => {
     const formData = new FormData(e.target);
     const value = formData.get('rss');
     state.form.feilds.rss = value;
-    try {
-      schema.validate(state.form.feilds, { abortEarly: false })
-        .then(() => {
-          if (_.findKey(state.feeds, ['url', value])) {
-            throw { message: i18next.t('errors.isLinkDuplication') };
-          }
-          axios.get(routes.corsProxy(value), { timeout: 5000 })
-            .then((res) => {
-              try {
-                const rssStream = rssParse(res.data);
-                const { feed, posts } = rssStream;
-                feed.url = value;
-                state.feeds.push(feed);
-                state.posts.push(...posts);
-                state.form.errors = {};
-                state.form.processState = 'finished';
-              } catch (error) {
-                state.form.errors = error;
-                state.form.processState = 'failed';
-              }
-            })
-            .catch((err) => {
-              state.form.errors = err;
+    schema.validate(state.form.feilds, { abortEarly: false })
+      .then(() => {
+        if (_.findKey(state.feeds, ['url', value])) {
+          throw { message: i18next.t('errors.isLinkDuplication') };
+        }
+        axios.get(routes.corsProxy(value), { timeout: 5000 })
+          .then((res) => {
+            try {
+              const rssStream = rssParse(res.data);
+              const { feed, posts } = rssStream;
+              feed.url = value;
+              state.feeds.push(feed);
+              state.posts.push(...posts);
+              state.form.errors = {};
+              state.form.processState = 'finished';
+            } catch (error) {
+              state.form.errors = error;
               state.form.processState = 'failed';
-            });
-        })
-        .catch((err) => {
-          state.form.errors = err;
-          state.form.processState = 'failed';
-        });
-    } catch (error) {
-      state.form.errors = error;
-      state.form.processState = 'failed';
-    }
+            }
+          })
+          .catch((err) => {
+            state.form.errors = err;
+            state.form.processState = 'failed';
+          });
+      })
+      .catch((err) => {
+        state.form.errors = err;
+        state.form.processState = 'failed';
+      });
   });
 
-  render(state);
+  render(state, output, form);
 };
 
 app();
