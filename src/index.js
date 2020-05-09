@@ -1,4 +1,5 @@
-/* eslint-disable no-throw-literal */
+/* eslint no-param-reassign: "error" */
+/* eslint-disable no-return-assign */
 /* eslint-env browser */
 
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -40,17 +41,18 @@ const rssParse = (data) => {
 
   const parseError = doc.querySelector('parsererror');
   if (parseError) {
-    throw { message: i18next.t('errors.isNotRss') };
+    throw new Error(i18next.t('errors.isNotRss'));
   }
 
-  feed.title = doc.querySelector('title').innerHTML;
-  feed.description = doc.querySelector('description').innerHTML;
+  feed.title = doc.querySelector('channel > title').textContent;
+  feed.description = doc.querySelector('channel > description').textContent;
   feed.id = _.uniqueId();
   const feedPosts = doc.querySelectorAll('item');
   feedPosts.forEach((post) => {
     posts.push({
-      postTitle: post.querySelector('title').innerHTML,
-      postLink: post.querySelector('link').nextSibling.textContent,
+      postTitle: post.querySelector('title').textContent,
+      postLink: post.querySelector('link').textContent,
+      pubDate: Date.parse(post.querySelector('pubDate').textContent),
       postId: _.uniqueId(),
       feedId: feed.id,
     });
@@ -60,7 +62,6 @@ const rssParse = (data) => {
 };
 
 const render = (state, output, form) => {
-  const html = output;
   form.reset();
   if (state.feeds.length === 0) {
     return;
@@ -81,12 +82,13 @@ const render = (state, output, form) => {
       const link = document.createElement('a');
       link.innerHTML = post.postTitle;
       link.href = post.postLink;
+      link.setAttribute('target', '_blank');
       div.append(link);
       li.append(div);
     });
     ul.append(li);
   });
-  html.innerHTML = '';
+  output.innerHTML = '';
   output.append(ul);
 };
 
@@ -96,14 +98,13 @@ const renderError = (field, error) => {
     field.classList.remove('is-invalid');
     errorElement.remove();
   }
-  if (_.isEmpty(error)) {
-    return;
+  if (error instanceof Error) {
+    const feedbackElement = document.createElement('div');
+    feedbackElement.classList.add('invalid-feedback');
+    feedbackElement.innerHTML = error.message;
+    field.classList.add('is-invalid');
+    field.after(feedbackElement);
   }
-  const feedbackElement = document.createElement('div');
-  feedbackElement.classList.add('invalid-feedback');
-  feedbackElement.innerHTML = error.message;
-  field.classList.add('is-invalid');
-  field.after(feedbackElement);
 };
 
 const renderForm = (form, state) => {
@@ -135,6 +136,26 @@ const renderForm = (form, state) => {
   }
 };
 
+const updateFeed = (feed, state, lastPubDate) => {
+  axios.get(routes.corsProxy(feed.url), { timeout: 5000 })
+    .then((res) => {
+      try {
+        const rssStream = rssParse(res.data);
+        const { posts } = rssStream;
+        posts.map((post) => post.feedId = feed.id);
+        const newPosts = posts.filter((post) => post.pubDate > lastPubDate);
+        state.posts.unshift(...newPosts);
+        const newPostPubDate = _.max(state.posts.map(({ pubDate }) => pubDate));
+        setTimeout(updateFeed, 5000, feed, state, newPostPubDate);
+      } catch (error) {
+        console.log(error);
+      }
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+};
+
 const app = () => {
   const form = document.querySelector('form');
   const output = document.querySelector('.output');
@@ -164,6 +185,10 @@ const app = () => {
     render(state, output, form);
   });
 
+  watch(state, 'posts', () => {
+    render(state, output, form);
+  });
+
   watch(state.form, 'processState', () => {
     renderForm(form, state);
   });
@@ -177,18 +202,20 @@ const app = () => {
     schema.validate(state.form.feilds, { abortEarly: false })
       .then(() => {
         if (_.findKey(state.feeds, ['url', value])) {
-          throw { message: i18next.t('errors.isLinkDuplication') };
+          throw new Error(i18next.t('errors.isLinkDuplication'));
         }
         axios.get(routes.corsProxy(value), { timeout: 5000 })
           .then((res) => {
             try {
               const rssStream = rssParse(res.data);
               const { feed, posts } = rssStream;
+              const maxPubDate = _.max(posts.map(({ pubDate }) => pubDate));
               feed.url = value;
               state.feeds.push(feed);
               state.posts.push(...posts);
               state.form.errors = {};
               state.form.processState = 'finished';
+              setTimeout(updateFeed, 5000, feed, state, maxPubDate);
             } catch (error) {
               state.form.errors = error;
               state.form.processState = 'failed';
