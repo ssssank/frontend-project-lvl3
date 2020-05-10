@@ -5,7 +5,6 @@ import i18next from 'i18next';
 
 const rssParse = (data) => {
   const feed = {};
-  const posts = [];
   const domparser = new DOMParser();
   const doc = domparser.parseFromString(data, 'text/xml');
 
@@ -18,15 +17,13 @@ const rssParse = (data) => {
   feed.description = doc.querySelector('channel > description').textContent;
   feed.id = _.uniqueId();
   const feedPosts = doc.querySelectorAll('item');
-  feedPosts.forEach((post) => {
-    posts.push({
-      postTitle: post.querySelector('title').textContent,
-      postLink: post.querySelector('link').textContent,
-      pubDate: Date.parse(post.querySelector('pubDate').textContent),
-      postId: _.uniqueId(),
-      feedId: feed.id,
-    });
-  });
+  const posts = [...feedPosts].map((post) => ({
+    postTitle: post.querySelector('title').textContent,
+    postLink: post.querySelector('link').textContent,
+    pubDate: Date.parse(post.querySelector('pubDate').textContent),
+    postId: _.uniqueId(),
+    feedId: feed.id,
+  }));
 
   return { feed, posts };
 };

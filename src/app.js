@@ -70,7 +70,6 @@ export default () => {
   const state = {
     form: {
       processState: 'filling',
-      processError: null,
       errors: {},
       feilds: {
         rss: '',
