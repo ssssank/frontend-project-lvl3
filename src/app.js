@@ -12,6 +12,9 @@ import resources from './locales';
 import rssParse from './parse';
 import { render, renderForm } from './renders';
 
+const requestTimeout = 5000;
+const updateInterval = 5000;
+
 i18next.init({
   lng: 'en',
   debug: true,
@@ -36,7 +39,7 @@ const schema = yup.object().shape({
 });
 
 const updateFeed = (feed, state, lastPubDate) => {
-  axios.get(routes.corsProxy(feed.url), { timeout: 5000 })
+  axios.get(routes.corsProxy(feed.url), { timeout: requestTimeout })
     .then((res) => {
       try {
         const rssStream = rssParse(res.data);
@@ -45,7 +48,7 @@ const updateFeed = (feed, state, lastPubDate) => {
         const newPosts = posts.filter((post) => post.pubDate > lastPubDate);
         state.posts.unshift(...newPosts);
         const newPostPubDate = _.max(state.posts.map(({ pubDate }) => pubDate));
-        setTimeout(updateFeed, 5000, feed, state, newPostPubDate);
+        setTimeout(updateFeed, updateInterval, feed, state, newPostPubDate);
       } catch (error) {
         console.log(error);
       }
@@ -80,11 +83,11 @@ export default () => {
   };
 
   watch(state, 'feeds', () => {
-    render(state, output, form);
+    render(state, output);
   });
 
   watch(state, 'posts', () => {
-    render(state, output, form);
+    render(state, output);
   });
 
   watch(state.form, 'processState', () => {
@@ -102,7 +105,7 @@ export default () => {
         if (_.findKey(state.feeds, ['url', value])) {
           throw new Error(i18next.t('errors.isLinkDuplication'));
         }
-        axios.get(routes.corsProxy(value), { timeout: 5000 })
+        axios.get(routes.corsProxy(value), { timeout: requestTimeout })
           .then((res) => {
             try {
               const rssStream = rssParse(res.data);
@@ -113,7 +116,7 @@ export default () => {
               state.posts.push(...posts);
               state.form.errors = {};
               state.form.processState = 'finished';
-              setTimeout(updateFeed, 5000, feed, state, maxPubDate);
+              setTimeout(updateFeed, updateInterval, feed, state, maxPubDate);
             } catch (error) {
               state.form.errors = error;
               state.form.processState = 'failed';
@@ -130,5 +133,5 @@ export default () => {
       });
   });
 
-  render(state, output, form);
+  render(state, output);
 };

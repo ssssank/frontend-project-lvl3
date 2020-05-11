@@ -3,8 +3,7 @@
 
 import i18next from 'i18next';
 
-const render = (state, output, form) => {
-  form.reset();
+const render = (state, output) => {
   if (state.feeds.length === 0) {
     return;
   }
@@ -37,6 +36,7 @@ const render = (state, output, form) => {
 const renderHelper = (field, message) => {
   const helperElement = field.nextElementSibling;
   if (helperElement) {
+    field.classList.remove('is-invalid');
     helperElement.remove();
   }
   const feedbackElement = document.createElement('div');
@@ -57,6 +57,7 @@ const renderForm = (form, state) => {
 
   switch (state.form.processState) {
     case 'filling':
+      form.reset();
       submit.classList.remove('disabled');
       field.removeAttribute('readonly');
       break;
