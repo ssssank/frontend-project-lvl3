@@ -1,6 +1,8 @@
 /* eslint no-param-reassign: "error" */
 /* eslint-env browser */
 
+import i18next from 'i18next';
+
 const render = (state, output, form) => {
   form.reset();
   if (state.feeds.length === 0) {
@@ -32,19 +34,21 @@ const render = (state, output, form) => {
   output.append(ul);
 };
 
-const renderError = (field, error) => {
-  const errorElement = field.nextElementSibling;
-  if (errorElement) {
-    field.classList.remove('is-invalid');
-    errorElement.remove();
+const renderHelper = (field, message) => {
+  const helperElement = field.nextElementSibling;
+  if (helperElement) {
+    helperElement.remove();
   }
-  if (error instanceof Error) {
-    const feedbackElement = document.createElement('div');
+  const feedbackElement = document.createElement('div');
+  if (message instanceof Error) {
     feedbackElement.classList.add('invalid-feedback');
-    feedbackElement.innerHTML = error.message;
     field.classList.add('is-invalid');
-    field.after(feedbackElement);
+  } else {
+    feedbackElement.classList.add('valid-feedback');
+    field.classList.add('is-valid');
   }
+  feedbackElement.innerHTML = message;
+  field.after(feedbackElement);
 };
 
 const renderForm = (form, state) => {
@@ -53,21 +57,21 @@ const renderForm = (form, state) => {
 
   switch (state.form.processState) {
     case 'filling':
-      field.value = '';
       submit.classList.remove('disabled');
       field.removeAttribute('readonly');
       break;
     case 'adding':
-      renderError(field, {});
+      renderHelper(field, i18next.t('waiting'));
       submit.classList.add('disabled');
       field.setAttribute('readonly', true);
       break;
     case 'failed':
-      renderError(field, state.form.errors);
+      renderHelper(field, state.form.errors);
       submit.classList.remove('disabled');
       field.removeAttribute('readonly');
       break;
     case 'finished':
+      renderHelper(field, i18next.t('success'));
       submit.classList.remove('disabled');
       field.removeAttribute('readonly');
       break;
@@ -76,4 +80,4 @@ const renderForm = (form, state) => {
   }
 };
 
-export { render, renderError, renderForm };
+export { render, renderForm };
