@@ -43,14 +43,20 @@ const updateFeed = (feed, state, lastPubDate) => {
     .then((res) => {
       try {
         const rssStream = rssParse(res.data);
-        const { posts } = rssStream;
+        const { items } = rssStream;
+        const posts = items.map((item) => ({
+          ...item,
+          id: _.uniqueId(),
+          feedId: feed.id,
+        }));
         posts.map((post) => post.feedId = feed.id);
         const newPosts = posts.filter((post) => post.pubDate > lastPubDate);
         state.posts.unshift(...newPosts);
-        const newPostPubDate = _.max(state.posts.map(({ pubDate }) => pubDate));
-        setTimeout(updateFeed, updateInterval, feed, state, newPostPubDate);
       } catch (error) {
         console.log(error);
+      } finally {
+        const newPostPubDate = _.max(state.posts.map(({ pubDate }) => pubDate));
+        setTimeout(updateFeed, updateInterval, feed, state, newPostPubDate);
       }
     })
     .catch((error) => {
@@ -61,11 +67,11 @@ const updateFeed = (feed, state, lastPubDate) => {
 export default () => {
   const form = document.querySelector('form');
   const output = document.querySelector('.output');
-  const title = document.querySelector('title');
+  const pageTitle = document.querySelector('title');
   const header = document.querySelector('h1');
   const label = document.querySelector('label');
 
-  title.innerHTML = i18next.t('page.title');
+  pageTitle.innerHTML = i18next.t('page.title');
   header.innerHTML = i18next.t('page.header');
   label.innerHTML = i18next.t('page.text');
   form.elements.add.innerHTML = i18next.t('page.button');
@@ -109,11 +115,21 @@ export default () => {
           .then((res) => {
             try {
               const rssStream = rssParse(res.data);
-              const { feed, posts } = rssStream;
+              const { title, description, items } = rssStream;
+              const feed = {
+                title,
+                description,
+                url: value,
+                id: _.uniqueId(),
+              };
+              const posts = items.map((item) => ({
+                ...item,
+                id: _.uniqueId(),
+                feedId: feed.id,
+              }));
               const maxPubDate = _.max(posts.map(({ pubDate }) => pubDate));
-              feed.url = value;
-              state.feeds.push(feed);
-              state.posts.push(...posts);
+              state.feeds.unshift(feed);
+              state.posts.unshift(...posts);
               state.form.errors = {};
               state.form.processState = 'finished';
               setTimeout(updateFeed, updateInterval, feed, state, maxPubDate);

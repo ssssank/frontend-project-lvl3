@@ -21,8 +21,8 @@ const render = (state, output) => {
     postsForRendering.forEach((post) => {
       const div = document.createElement('div');
       const link = document.createElement('a');
-      link.innerHTML = post.postTitle;
-      link.href = post.postLink;
+      link.innerHTML = post.title;
+      link.href = post.link;
       link.setAttribute('target', '_blank');
       div.append(link);
       li.append(div);
