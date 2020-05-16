@@ -2,6 +2,7 @@
 /* eslint-env browser */
 
 import i18next from 'i18next';
+import { watch } from 'melanke-watchjs';
 
 const render = (state, output) => {
   if (state.feeds.length === 0) {
@@ -81,4 +82,18 @@ const renderForm = (form, state) => {
   }
 };
 
-export { render, renderForm };
+// export { render, renderForm };
+
+export default (state, form, output) => {
+  watch(state, 'feeds', () => {
+    render(state, output);
+  });
+
+  watch(state, 'posts', () => {
+    render(state, output);
+  });
+
+  watch(state.form, 'processState', () => {
+    renderForm(form, state);
+  });
+};

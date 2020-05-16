@@ -3,14 +3,13 @@
 /* eslint-env browser */
 
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { watch } from 'melanke-watchjs';
 import _ from 'lodash';
 import * as yup from 'yup';
 import axios from 'axios';
 import i18next from 'i18next';
 import resources from './locales';
 import rssParse from './parse';
-import { render, renderForm } from './renders';
+import runWatchers from './watchers';
 
 const requestTimeout = 5000;
 const updateInterval = 5000;
@@ -88,18 +87,6 @@ export default () => {
     posts: [],
   };
 
-  watch(state, 'feeds', () => {
-    render(state, output);
-  });
-
-  watch(state, 'posts', () => {
-    render(state, output);
-  });
-
-  watch(state.form, 'processState', () => {
-    renderForm(form, state);
-  });
-
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     state.form.processState = 'adding';
@@ -149,5 +136,5 @@ export default () => {
       });
   });
 
-  render(state, output);
+  runWatchers(state, form, output);
 };
