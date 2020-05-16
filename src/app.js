@@ -57,6 +57,48 @@ const updateFeed = (feed, state, lastPubDate) => {
     });
 };
 
+const validateInput = (state, value) => {
+  schema.validateSync(state.form.feilds, { abortEarly: false });
+  if (_.findKey(state.feeds, ['url', value])) {
+    throw new Error(i18next.t('errors.isLinkDuplication'));
+  }
+};
+
+const getRss = (state, value) => {
+  state.form.processState = 'adding';
+  axios.get(routes.corsProxy(value), { timeout: requestTimeout })
+    .then((res) => {
+      try {
+        const rssStream = rssParse(res.data);
+        const { title, description, items } = rssStream;
+        const feed = {
+          title,
+          description,
+          url: value,
+          id: _.uniqueId(),
+        };
+        const posts = items.map((item) => ({
+          ...item,
+          id: _.uniqueId(),
+          feedId: feed.id,
+        }));
+        const maxPubDate = _.max(posts.map(({ pubDate }) => pubDate));
+        state.feeds.unshift(feed);
+        state.posts.unshift(...posts);
+        state.form.errors = {};
+        state.form.processState = 'finished';
+        setTimeout(updateFeed, updateInterval, feed, state, maxPubDate);
+      } catch (error) {
+        state.form.errors = error;
+        state.form.processState = 'failed';
+      }
+    })
+    .catch((err) => {
+      state.form.errors = err;
+      state.form.processState = 'failed';
+    });
+};
+
 export default () => {
   i18next.init({
     lng: 'en',
@@ -89,51 +131,16 @@ export default () => {
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    state.form.processState = 'adding';
     const formData = new FormData(e.target);
     const value = formData.get('rss');
     state.form.feilds.rss = value;
-    schema.validate(state.form.feilds, { abortEarly: false })
-      .then(() => {
-        if (_.findKey(state.feeds, ['url', value])) {
-          throw new Error(i18next.t('errors.isLinkDuplication'));
-        }
-        axios.get(routes.corsProxy(value), { timeout: requestTimeout })
-          .then((res) => {
-            try {
-              const rssStream = rssParse(res.data);
-              const { title, description, items } = rssStream;
-              const feed = {
-                title,
-                description,
-                url: value,
-                id: _.uniqueId(),
-              };
-              const posts = items.map((item) => ({
-                ...item,
-                id: _.uniqueId(),
-                feedId: feed.id,
-              }));
-              const maxPubDate = _.max(posts.map(({ pubDate }) => pubDate));
-              state.feeds.unshift(feed);
-              state.posts.unshift(...posts);
-              state.form.errors = {};
-              state.form.processState = 'finished';
-              setTimeout(updateFeed, updateInterval, feed, state, maxPubDate);
-            } catch (error) {
-              state.form.errors = error;
-              state.form.processState = 'failed';
-            }
-          })
-          .catch((err) => {
-            state.form.errors = err;
-            state.form.processState = 'failed';
-          });
-      })
-      .catch((err) => {
-        state.form.errors = err;
-        state.form.processState = 'failed';
-      });
+    try {
+      validateInput(state, value);
+      getRss(state, value);
+    } catch (error) {
+      state.form.errors = error;
+      state.form.processState = 'failed';
+    }
   });
 
   runWatchers(state, form, output);
