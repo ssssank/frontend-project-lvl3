@@ -1,7 +1,6 @@
 /* eslint-env browser */
 
 import _ from 'lodash';
-import i18next from 'i18next';
 
 const rssParse = (data) => {
   const feed = {};
@@ -10,7 +9,7 @@ const rssParse = (data) => {
 
   const parseError = doc.querySelector('parsererror');
   if (parseError) {
-    throw new Error(i18next.t('errors.isNotRss'));
+    throw new Error(parseError.textContent);
   }
 
   feed.title = doc.querySelector('channel > title').textContent;

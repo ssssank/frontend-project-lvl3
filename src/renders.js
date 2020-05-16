@@ -47,7 +47,7 @@ const renderHelper = (field, message) => {
     feedbackElement.classList.add('valid-feedback');
     field.classList.add('is-valid');
   }
-  feedbackElement.innerHTML = message;
+  feedbackElement.textContent = message;
   field.after(feedbackElement);
 };
 
