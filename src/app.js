@@ -15,12 +15,6 @@ import { render, renderForm } from './renders';
 const requestTimeout = 5000;
 const updateInterval = 5000;
 
-i18next.init({
-  lng: 'en',
-  debug: true,
-  resources,
-});
-
 const routes = {
   corsProxy: (url) => `https://cors-anywhere.herokuapp.com/${url}`,
 };
@@ -65,6 +59,12 @@ const updateFeed = (feed, state, lastPubDate) => {
 };
 
 export default () => {
+  i18next.init({
+    lng: 'en',
+    debug: true,
+    resources,
+  });
+
   const form = document.querySelector('form');
   const output = document.querySelector('.output');
   const pageTitle = document.querySelector('title');
