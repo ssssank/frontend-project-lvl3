@@ -18,19 +18,6 @@ const routes = {
   corsProxy: (url) => `https://cors-anywhere.herokuapp.com/${url}`,
 };
 
-yup.setLocale({
-  string: {
-    url: i18next.t('errors.isNotUrl'),
-  },
-  mixed: {
-    required: i18next.t('errors.isRequired'),
-  },
-});
-
-const schema = yup.object().shape({
-  rss: yup.string().required().url(),
-});
-
 const updateFeed = (feed, state, lastPubDate) => {
   axios.get(routes.corsProxy(feed.url), { timeout: requestTimeout })
     .then((res) => {
@@ -47,25 +34,36 @@ const updateFeed = (feed, state, lastPubDate) => {
         state.posts.unshift(...newPosts);
       } catch (error) {
         console.log(error);
-      } finally {
-        const newPostPubDate = _.max(state.posts.map(({ pubDate }) => pubDate));
-        setTimeout(updateFeed, updateInterval, feed, state, newPostPubDate);
       }
     })
     .catch((error) => {
       console.log(error);
+    })
+    .finally(() => {
+      const newPostPubDate = _.max(state.posts.map(({ pubDate }) => pubDate));
+      setTimeout(updateFeed, updateInterval, feed, state, newPostPubDate);
     });
 };
 
-const validateInput = (state, value) => {
-  schema.validateSync(state.form.feilds, { abortEarly: false });
-  if (_.findKey(state.feeds, ['url', value])) {
+const validateInput = (feeds, value) => {
+  yup.setLocale({
+    string: {
+      url: i18next.t('errors.isNotUrl'),
+    },
+    mixed: {
+      required: i18next.t('errors.isRequired'),
+    },
+  });
+
+  const schema = yup.string().required().url();
+
+  schema.validateSync(value);
+  if (_.findKey(feeds, ['url', value])) {
     throw new Error(i18next.t('errors.isLinkDuplication'));
   }
 };
 
 const getRss = (state, value) => {
-  state.form.processState = 'adding';
   axios.get(routes.corsProxy(value), { timeout: requestTimeout })
     .then((res) => {
       try {
@@ -131,11 +129,12 @@ export default () => {
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
+    state.form.processState = 'adding';
     const formData = new FormData(e.target);
     const value = formData.get('rss');
     state.form.feilds.rss = value;
     try {
-      validateInput(state, value);
+      validateInput(state.feeds, value);
       getRss(state, value);
     } catch (error) {
       state.form.errors = error;
