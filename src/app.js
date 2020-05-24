@@ -55,12 +55,11 @@ const validateInput = (feeds, value) => {
     },
   });
 
-  const schema = yup.string().required().url();
+  const urls = feeds.map((feed) => feed.url);
+
+  const schema = yup.string().required().url().notOneOf(urls, i18next.t('errors.isLinkDuplication'));
 
   schema.validateSync(value);
-  if (_.findKey(feeds, ['url', value])) {
-    throw new Error(i18next.t('errors.isLinkDuplication'));
-  }
 };
 
 const getRss = (state, value) => {
@@ -119,9 +118,6 @@ export default () => {
     form: {
       processState: 'filling',
       errors: {},
-      feilds: {
-        rss: '',
-      },
     },
     feeds: [],
     posts: [],
@@ -132,7 +128,6 @@ export default () => {
     state.form.processState = 'adding';
     const formData = new FormData(e.target);
     const value = formData.get('rss');
-    state.form.feilds.rss = value;
     try {
       validateInput(state.feeds, value);
       getRss(state, value);
