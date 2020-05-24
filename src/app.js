@@ -18,20 +18,20 @@ const routes = {
   corsProxy: (url) => `https://cors-anywhere.herokuapp.com/${url}`,
 };
 
-const updateFeed = (feed, state, lastPubDate) => {
+const updateFeed = (feed, state) => {
   axios.get(routes.corsProxy(feed.url), { timeout: requestTimeout })
     .then((res) => {
       try {
         const rssStream = rssParse(res.data);
         const { items } = rssStream;
-        const posts = items.map((item) => ({
+        const newPosts = items.map((item) => ({
           ...item,
           id: _.uniqueId(),
           feedId: feed.id,
         }));
-        posts.map((post) => post.feedId = feed.id);
-        const newPosts = posts.filter((post) => post.pubDate > lastPubDate);
-        state.posts.unshift(...newPosts);
+        const oldPosts = state.posts.filter((post) => post.feedId === feed.id);
+        const postToAdd = _.differenceWith(newPosts, oldPosts, (p1, p2) => p1.link === p2.link);
+        state.posts.unshift(...postToAdd);
       } catch (error) {
         console.log(error);
       }
@@ -40,8 +40,7 @@ const updateFeed = (feed, state, lastPubDate) => {
       console.log(error);
     })
     .finally(() => {
-      const newPostPubDate = _.max(state.posts.map(({ pubDate }) => pubDate));
-      setTimeout(updateFeed, updateInterval, feed, state, newPostPubDate);
+      setTimeout(updateFeed, updateInterval, feed, state);
     });
 };
 
@@ -79,12 +78,11 @@ const getRss = (state, value) => {
           id: _.uniqueId(),
           feedId: feed.id,
         }));
-        const maxPubDate = _.max(posts.map(({ pubDate }) => pubDate));
         state.feeds.unshift(feed);
         state.posts.unshift(...posts);
         state.form.errors = {};
         state.form.processState = 'finished';
-        setTimeout(updateFeed, updateInterval, feed, state, maxPubDate);
+        setTimeout(updateFeed, updateInterval, feed, state);
       } catch (error) {
         state.form.errors = error;
         state.form.processState = 'failed';

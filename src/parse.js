@@ -15,8 +15,7 @@ const rssParse = (data) => {
   const items = [...feedItems].map((item) => {
     const itemTitle = item.querySelector('title').textContent;
     const link = item.querySelector('link').textContent;
-    const pubDate = Date.parse(item.querySelector('pubDate').textContent);
-    return { title: itemTitle, link, pubDate };
+    return { title: itemTitle, link };
   });
 
   return { title, description, items };

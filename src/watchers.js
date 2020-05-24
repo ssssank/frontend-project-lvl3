@@ -73,6 +73,7 @@ const renderForm = (form, state) => {
       field.removeAttribute('readonly');
       break;
     case 'finished':
+      form.reset();
       renderHelper(field, i18next.t('success'));
       submit.classList.remove('disabled');
       field.removeAttribute('readonly');
@@ -81,8 +82,6 @@ const renderForm = (form, state) => {
       throw new Error(`Unknown form state: '${state.form.processState}'`);
   }
 };
-
-// export { render, renderForm };
 
 export default (state, form, output) => {
   watch(state, 'feeds', () => {
