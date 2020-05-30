@@ -4,7 +4,7 @@ import * as yup from 'yup';
 import axios from 'axios';
 import i18next from 'i18next';
 import resources from './locales';
-import rssParse from './parse';
+import rssParse from './parser';
 import runWatchers from './watchers';
 
 const requestTimeout = 5000;
@@ -27,9 +27,6 @@ const updateFeed = (feed, state) => {
       const oldPosts = state.posts.filter((post) => post.feedId === feed.id);
       const postToAdd = _.differenceWith(newPosts, oldPosts, (p1, p2) => p1.link === p2.link);
       state.posts.unshift(...postToAdd);
-    })
-    .catch((error) => {
-      console.log(error);
     })
     .finally(() => {
       setTimeout(updateFeed, updateInterval, feed, state);

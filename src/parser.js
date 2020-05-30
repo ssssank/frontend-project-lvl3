@@ -1,5 +1,3 @@
-/* eslint-env browser */
-
 const rssParse = (data) => {
   const domparser = new DOMParser();
   const doc = domparser.parseFromString(data, 'text/xml');
