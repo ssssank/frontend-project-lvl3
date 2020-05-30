@@ -1,7 +1,3 @@
-/* eslint no-param-reassign: "error" */
-/* eslint-disable no-return-assign */
-/* eslint-env browser */
-
 import 'bootstrap/dist/css/bootstrap.min.css';
 import _ from 'lodash';
 import * as yup from 'yup';

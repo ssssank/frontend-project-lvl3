@@ -1,6 +1,3 @@
-/* eslint no-param-reassign: "error" */
-/* eslint-env browser */
-
 import i18next from 'i18next';
 import { watch } from 'melanke-watchjs';
 
